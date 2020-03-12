@@ -10,7 +10,6 @@ import arrow
 import re
 import schedule
 
-import Logger
 import OperaFile
 import wcf2xml
 import xml2json
@@ -19,15 +18,18 @@ from const import Urls
 from configparser import ConfigParser
 
 # 初始化类
+from get_logger import get_logger
+
 cp = ConfigParser()
 cp.read("resources/config.cfg")
 
+logger = get_logger()
 
 class GpointCollectAQI:
     def __init__(self):
-        self.logger = Logger.setup_logging(default_path="resources/logging.yml", name=__name__)
-        self.site_info_file = "GetStationConfigs"
-        self.site_aqi = "GetAQIDataPublishLives"
+
+        self.site_info_file = "data/GetStationConfigs"
+        self.site_aqi = "data/GetAQIDataPublishLives"
 
         self.station_dict = {}
 
@@ -40,20 +42,21 @@ class GpointCollectAQI:
         per = 100.0 * a * b / c
         if per >= 100:
             per = 100
-        self.logger.info('%.2f%%' % per)
+        logger.info('%.2f%%' % per)
 
     def send_socket(self, data, ip, port):
         for i in range(1, 4):
             try:
-                tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.logger.info("准备创建tcp client, " + str(i) + "次")
-                # tcp_client.connect(('192.168.15.54', 9000))
-                tcp_client.settimeout(20)
-                tcp_client.connect((ip, port))
-                self.logger.info("socket 连接成功：" + str(tcp_client.getsockname()) + "-->" + str(tcp_client.getpeername()))
                 datas = data.encode()
                 lbytes = int.to_bytes(datas.__len__(), 4, byteorder='big')
                 b = lbytes + datas
+
+                tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                logger.info("准备创建tcp client【"+ip + str(port) + "】, " + str(i) + "次")
+                # tcp_client.connect(('192.168.15.54', 9000))
+                tcp_client.settimeout(20)
+                tcp_client.connect((ip, port))
+                logger.info("socket 连接成功：" + str(tcp_client.getsockname()) + "-->" + str(tcp_client.getpeername()))
                 tcp_client.send(b)
 
                 len_bytes = tcp_client.recv(4)
@@ -68,13 +71,13 @@ class GpointCollectAQI:
                 #         break
                 tcp_client.close()
                 result = buffer.decode(encoding="utf-8")
-                self.logger.info("socket 回复：" + buffer.decode(encoding="utf-8"))
+                logger.info("socket 回复：" + buffer.decode(encoding="utf-8"))
                 if json.loads(result).get("code") == "111":
-                    self.logger.info("发送成功，结束")
+                    logger.info("发送成功，结束")
                     return True
-                self.logger.info("发送失败：" + str(i) + "次")
+                logger.info("发送失败：" + str(i) + "次")
             except Exception as e:
-                self.logger.error("发送tcp数据包异常", e)
+                logger.error("发送tcp数据包异常", e)
         return False
 
     def isNumber(self, str):
@@ -97,38 +100,44 @@ class GpointCollectAQI:
         下载小时AQI,转换为xml,再转换为json保存文件,返回json对象
         :return:
         """
+        # 保存地址
+        file_path = self.site_aqi
         url = Urls.GET_SITE_AQI_URL
         # request.urlretrieve(url, "GetAQIDataPublishLives", download_schedule)
-        request.urlretrieve(url, self.site_aqi)
-        wcf2xml.wcf2xmlMain(self.site_aqi, self.site_aqi + "_xml")
-        # self.logger.info(data._content)
+        request.urlretrieve(url, file_path)
+        wcf2xml.wcf2xmlMain(file_path, file_path + "_xml")
+        # logger.info(data._content)
 
-        json_data = xml2json.data_from_xml_json(self.site_aqi + "_xml", Consts.SITE_AQI_ENTITY_TAG)
-        today = arrow.now().format("YYYYMMDD")
-        path = os.getcwd() + os.sep + "data" + os.sep + today
-        if not os.path.exists(path):
-            os.makedirs(path)
-        file_name = self.site_aqi + "_" + arrow.now().format("YYYYMMDDHH") + ".json"
-        file_path = path + os.sep + file_name
-        self.logger.info("保存AQI数据:%s" % (file_path))
-        OperaFile.write_txt(filename=file_path, str=str(json_data))
+        json_data = xml2json.data_from_xml_json(file_path + "_xml", Consts.SITE_AQI_ENTITY_TAG)
+        # today = arrow.now().format("YYYYMMDD")
+        # path = os.getcwd() + os.sep + "data" + os.sep + today
+        # if not os.path.exists(path):
+        #     os.makedirs(path)
+        # TODO 数据暂时不保存
+        # file_name = self.site_aqi + "_" + arrow.now().format("YYYYMMDDHH") + ".json"
+        # file_path = path + os.sep + file_name
+        # logger.info("保存AQI数据:%s" % (file_path))
+        # OperaFile.write_txt(filename=file_path, str=str(json_data))
         return json_data
 
     def get_site_air_data(self):
         # 判断时间，小时是否大于30
         # 读取上个时间发送的时间
-        hour_last_time_file = "const/hour_last_time"
+        hour_last_time_file = "const/hour_last_time.txt"
         hour_last_time = OperaFile.read_txt(filename=hour_last_time_file)
         now = arrow.now()
-        if now.minute <= 30 or hour_last_time == now.format("YYYY-MM-DD HH:00:00"):
-            self.logger.debug("分钟小于30或者采集时间(" + hour_last_time + ")等于当前时间，跳过")
+        if now.minute < 30 or hour_last_time == now.format("YYYY-MM-DD HH:00:00"):
+            logger.debug("分钟小于30或者采集时间(" + hour_last_time + ")等于当前时间，跳过")
             return
 
         try:
-            self.logger.info("获取全国站点AQI...")
+            logger.info("获取全国站点小时AQI...")
 
             json_data = self.get_site_hour_aqi()
-
+            if json_data is not None and json_data.__len__() > 0:
+                logger.info("采集成功:【"+str(json_data.__len__())+"】个,监测时间:" + str(json_data[0]["timepoint"]))
+            else:
+                logger.info("采集失败！")
             send_data_list = []
             equals_count = 0
 
@@ -140,7 +149,7 @@ class GpointCollectAQI:
                     if site_code not in Consts.FILTER_SITES:
                         site_code = self.station_dict.get(site_code, site_code)
                     if str(site_code).startswith('41'):
-                        self.logger.debug("河南省的数据，跳过:" + str(d))
+                        logger.debug("河南省的数据，跳过:" + str(d))
                         continue
                     send_data = {}
                     send_data["PM10"] = d.get('pm10') if self.isNumber(d.get('pm10')) else "0"
@@ -155,26 +164,26 @@ class GpointCollectAQI:
                     send_data["SITECODE"] = site_code
                     send_data["DATASOURCES"] = "cnemc.cn"
                     if hour_last_time == send_data["MONITORTIME"]:
-                        self.logger.debug("重复数据，不发送：" + str(send_data))
+                        logger.debug("重复数据，不发送：" + str(send_data))
                         equals_count += 1
                         continue
                     monitor_time = send_data["MONITORTIME"]
                     send_data_list.append(send_data)
                 except Exception as e:
-                    self.logger.error("循环数据时异常", e)
+                    logger.error("循环数据时异常", e)
             if len(send_data_list) <= 0:
-                self.logger.info("有效数据：0，重复数据：" + str(equals_count))
+                logger.info("有效数据：0，重复数据：" + str(equals_count))
                 return
             send_status = self.send_data(send_data_list)
             if send_status:
-                self.logger.info("发送成功，修改时间:" + monitor_time)
+                logger.info("发送成功，修改时间:" + monitor_time)
                 # 发送成功后，保存最新的发送时间
                 OperaFile.write_txt(filename=hour_last_time_file, str=monitor_time)
         except Exception as e:
-            self.logger.error("采集全国站点AQI数据异常", e)
+            logger.error("采集全国站点AQI数据异常", e)
 
     def send_data(self, send_data_list):
-        self.logger.info("发送数据：" + str(send_data_list.__len__()) + "个")
+        logger.info("发送数据：" + str(send_data_list.__len__()) + "个")
         send_data_json = {
             'appId': 'datacollect',
             'appKey': '123456789',
@@ -208,19 +217,19 @@ class GpointCollectAQI:
 
     def get_site_info_xml(self):
 
-        self.logger.info("下载站点信息xml...")
+        logger.info("下载站点信息xml...")
         url = Urls.GET_SITE_URL
         request.urlretrieve(url, self.site_info_file, self.download_schedule)
 
     def get_site_info(self):
-        self.logger.info("加载站点基础信息...")
+        logger.info("加载站点基础信息...")
         wcf2xml.wcf2xmlMain(self.site_info_file, self.site_info_file + "_xml")
-        # self.logger.info(data._content)
+        # logger.info(data._content)
 
         json_data = xml2json.data_from_xml_json(self.site_info_file + "_xml", Consts.SITE_ENTITY_TAG)
         for d in json_data:
             self.station_dict[d['stationcode']] = d['uniquecode']
-        self.logger.info("加载成功：" + str(len(self.station_dict)) + "个")
+        logger.info("加载成功：" + str(len(self.station_dict)) + "个")
         return self.station_dict
 
 
@@ -232,12 +241,15 @@ if __name__ == '__main__':
     gc.get_site_info()
 
     gc.get_site_air_data()
+    """
+        定义定时任务
+    """
     # 每15分钟执行一次小时数据AQI抓取
     schedule.every(1).minute.do(gc.get_site_air_data)
     # 每天下载一次站点信息xml
     schedule.every().day.at("01:10").do(gc.get_site_info_xml)
     for job in schedule.jobs:
-        gc.logger.info(str(job))
+        logger.info(str(job))
     while True:
         schedule.run_pending()
         time.sleep(1)
