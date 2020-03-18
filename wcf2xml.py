@@ -1,4 +1,5 @@
-#!/usr/bin/env python2
+# -*- coding:utf-8 -*-
+# !/usr/bin/env python2
 #  Copyright (c) 2011, Timo Schmid <tschmid@ernw.de>
 #  All rights reserved.
 #  

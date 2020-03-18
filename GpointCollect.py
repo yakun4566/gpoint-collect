@@ -1,23 +1,18 @@
 # -*- coding:utf-8 -*-
 
 import json
-import os
+import re
 import socket
-import time
+from configparser import ConfigParser
 from urllib import request
 
 import arrow
-import re
-import schedule
 
 import OperaFile
 import wcf2xml
 import xml2json
 from const import Consts
 from const import Urls
-from configparser import ConfigParser
-
-# 初始化类
 from get_logger import get_logger
 
 cp = ConfigParser()
@@ -237,20 +232,21 @@ class GpointCollectAQI:
 if __name__ == '__main__':
     gc = GpointCollectAQI()
     # 初始换静态变量
+    gc.get_site_info_xml()
 
     gc.get_site_info()
 
-    gc.get_site_air_data()
+    # gc.get_site_air_data()
     """
         定义定时任务
     """
-    # 每15分钟执行一次小时数据AQI抓取
-    schedule.every(1).minute.do(gc.get_site_air_data)
-    # 每天下载一次站点信息xml
-    schedule.every().day.at("01:10").do(gc.get_site_info_xml)
-    for job in schedule.jobs:
-        logger.info(str(job))
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-    pass
+    # # 每15分钟执行一次小时数据AQI抓取
+    # schedule.every(1).minute.do(gc.get_site_air_data)
+    # # 每天下载一次站点信息xml
+    # schedule.every().day.at("01:10").do(gc.get_site_info_xml)
+    # for job in schedule.jobs:
+    #     logger.info(str(job))
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(1)
+    # pass

@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import threading
 
 import schedule
@@ -5,11 +6,10 @@ import time
 
 import CityAQICollect
 import GpointCollect
+# schedule.logger = logger
 from get_logger import get_logger
 
 logger = get_logger()
-schedule.logger = logger
-
 def run_threaded(job_func):
     job_thread = threading.Thread(target=job_func)
     job_thread.start()
@@ -20,8 +20,8 @@ if __name__ == '__main__':
 
     # 启动时先采集一次数据
 
-    run_threaded(gc.get_site_air_data())
-    run_threaded(cac.get_city_hour_aqi())
+    gc.get_site_air_data()
+    cac.get_city_hour_aqi()
 
     """
         定义定时任务
