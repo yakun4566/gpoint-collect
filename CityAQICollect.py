@@ -22,14 +22,16 @@ from rabbit.RabbitMQ import RabbitMQ
 #                  "371081:371081","371082:371082","371083:371083","532301:532300","532522:532500","532621:532600",
 #                  "532801:532800","532901:532900","533103:533100","533321:533300","533421:533400","632100:632100",
 #                  "659001:659001","659004:659004"]
-transfromcode = ["131200:130700","210281:210281","211200:211200","320281:320281","320282:320282","320481:320481",
+transfromcode = [
+        "131200:130700","210281:210281","211200:211200","320281:320281","320282:320282","320481:320481",
                  "320482:320482","320581:320581","320582:320582","320583:320583","320584:320584","320585:320585",
                  "320684:320684","321183:321183","330183:330183","330185:330185","330681:330681","330782:330782",
                  "331300:330600","360600:360600","370181:370181","370281:370281","370282:370282","370283:370283",
                  "370284:370284","370285:370285","370683:370683","370684:370684","370685:370685","370783:370783",
                  "371081:371081","371082:371082","371083:371083","532301:532300","532522:532500","532621:532600",
                  "532801:532800","532901:532900","533103:533100","533321:533300","533421:533400","632100:632100",
-                 "659001:659001","659004:659004"]
+                 "659001:659001","659004:659004","522400:520500","522200:520600"
+                 ]
 logger = get_logger()
 class CityAQICollect():
     def __init__(self):
@@ -123,6 +125,10 @@ class CityAQICollect():
         # 调用put方法，向目标queue中发送数据， 第一个参数是data, 第二个参数是queue_name, 第三个参数是route_name
         for data in datas:
             citycode = data.get("citycode")
+            # 如果是河南省的数据，就跳过
+            if str(citycode).startswith("41"):
+                logger.debug("河南省数据，跳过，citycode:" + str(citycode))
+                continue
             for code in transfromcode:
                 if code.startswith(citycode):
                     transcode = code.split(":")[1]
@@ -140,20 +146,21 @@ class CityAQICollect():
 if __name__ == '__main__':
     cac = CityAQICollect()
     cac.get_city_hour_aqi()
-    # cac.get_city_day_aqi()
-
-    # 初始换静态变量
-
-    """
-        定义定时任务
-    """
+    cac.get_city_day_aqi()
+    # # cac.get_city_day_aqi()
     #
-    schedule.every(1).minute.do(cac.get_city_hour_aqi)
-    # 每天下载一次站点信息xml
-    schedule.every().day.at("05:00").do(cac.get_city_day_aqi)
-    for job in schedule.jobs:
-        logger.info(str(job))
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    # # 初始换静态变量
+    #
+    # """
+    #     定义定时任务
+    # """
+    # #
+    # schedule.every(1).minute.do(cac.get_city_hour_aqi)
+    # # 每天下载一次站点信息xml
+    # schedule.every().day.at("05:00").do(cac.get_city_day_aqi)
+    # for job in schedule.jobs:
+    #     logger.info(str(job))
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(1)
 
